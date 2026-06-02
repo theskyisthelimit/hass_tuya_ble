@@ -21,6 +21,7 @@ from .const import (
     CONF_FUNCTIONS,
     CONF_PRODUCT_MODEL,
     CONF_PRODUCT_NAME,
+    CONF_PRODUCT_ID,
     CONF_STATUS_RANGE,
     DOMAIN,
 )
@@ -43,6 +44,7 @@ _LOGGER = logging.getLogger(__name__)
 LEGACY_CONF_MAC = "mac"
 DEFAULT_FINGERBOT_CATEGORY = "szjqr"
 DEFAULT_FINGERBOT_PRODUCT_NAME = "Fingerbot Plus"
+DEFAULT_FINGERBOT_PRODUCT_ID = "yiihr7zh"
 
 
 def _entry_manager_data(entry: ConfigEntry) -> dict:
@@ -53,6 +55,8 @@ def _entry_manager_data(entry: ConfigEntry) -> dict:
         data[CONF_ADDRESS] = data[LEGACY_CONF_MAC]
     if CONF_CATEGORY not in data:
         data[CONF_CATEGORY] = DEFAULT_FINGERBOT_CATEGORY
+    if CONF_PRODUCT_ID not in data:
+        data[CONF_PRODUCT_ID] = DEFAULT_FINGERBOT_PRODUCT_ID
     if CONF_PRODUCT_NAME not in data:
         data[CONF_PRODUCT_NAME] = DEFAULT_FINGERBOT_PRODUCT_NAME
     if CONF_DEVICE_NAME not in data:

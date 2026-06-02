@@ -6,6 +6,7 @@ import logging
 import secrets
 import time
 from collections.abc import Callable
+from contextlib import suppress
 from struct import pack, unpack
 from dataclasses import dataclass
 from typing import Any
@@ -690,14 +691,24 @@ class TuyaBLEDevice:
     async def _execute_disconnect(self) -> None:
         """Execute disconnection."""
         async with self._connect_lock:
-            client = self._client
-            self._expected_disconnect = True
-            self._client = None
-            if client and client.is_connected:
-                await client.stop_notify(CHARACTERISTIC_NOTIFY)
-                await client.disconnect()
+            await self._close_client_unlocked(expected_disconnect=True)
+        await self._reset_sequence()
+
+    async def _reset_sequence(self) -> None:
         async with self._seq_num_lock:
             self._current_seq_num = 1
+
+    async def _close_client_unlocked(self, expected_disconnect: bool) -> None:
+        """Close active BLE client while caller holds _connect_lock."""
+        client = self._client
+        self._expected_disconnect = expected_disconnect
+        self._client = None
+        self._is_paired = False
+        if client and client.is_connected:
+            with suppress(Exception):
+                await client.stop_notify(CHARACTERISTIC_NOTIFY)
+            with suppress(Exception):
+                await client.disconnect()
 
     async def _ensure_connected(self) -> None:
         """Ensure connection to device is established."""
@@ -718,7 +729,7 @@ class TuyaBLEDevice:
             await asyncio.sleep(0.01)
             if self._client and self._client.is_connected and self._is_paired:
                 return
-            attempts_count = 100
+            attempts_count = 5
             while attempts_count > 0:
                 attempts_count -= 1
                 if attempts_count == 0:
@@ -760,17 +771,22 @@ class TuyaBLEDevice:
                     continue
 
                 if client and client.is_connected:
-                    _LOGGER.debug("%s: Connected; RSSI: %s",
-                                  self.address, self.rssi)
+                    _LOGGER.debug(
+                        "%s: Connected; RSSI: %s", self.address, self.rssi
+                    )
                     self._client = client
                     try:
                         await self._client.start_notify(
                             CHARACTERISTIC_NOTIFY, self._notification_handler
                         )
                     except:  # [BLEAK_EXCEPTIONS, BleakNotFoundError]:
-                        self._client = None
-                        _LOGGER.error("%s: starting notifications failed",
-                                      self.address, exc_info=True)
+                        await self._close_client_unlocked(False)
+                        await self._reset_sequence()
+                        _LOGGER.error(
+                            "%s: starting notifications failed",
+                            self.address,
+                            exc_info=True,
+                        )
                         continue
                 else:
                     continue
@@ -785,16 +801,21 @@ class TuyaBLEDevice:
                             0,
                             True,
                         ):
-                            self._client = None
+                            await self._close_client_unlocked(False)
+                            await self._reset_sequence()
                             _LOGGER.error(
                                 "%s: Sending device info request failed",
                                 self.address,
                             )
                             continue
                     except:  # [BLEAK_EXCEPTIONS, BleakNotFoundError]:
-                        self._client = None
-                        _LOGGER.error("%s: Sending device info request failed",
-                                      self.address, exc_info=True)
+                        await self._close_client_unlocked(False)
+                        await self._reset_sequence()
+                        _LOGGER.error(
+                            "%s: Sending device info request failed",
+                            self.address,
+                            exc_info=True,
+                        )
                         continue
                 else:
                     continue
@@ -808,16 +829,21 @@ class TuyaBLEDevice:
                             0,
                             True,
                         ):
-                            self._client = None
+                            await self._close_client_unlocked(False)
+                            await self._reset_sequence()
                             _LOGGER.error(
                                 "%s: Sending pairing request failed",
                                 self.address,
                             )
                             continue
                     except:  # [BLEAK_EXCEPTIONS, BleakNotFoundError]:
-                        self._client = None
-                        _LOGGER.error("%s: Sending pairing request failed",
-                                      self.address, exc_info=True)
+                        await self._close_client_unlocked(False)
+                        await self._reset_sequence()
+                        _LOGGER.error(
+                            "%s: Sending pairing request failed",
+                            self.address,
+                            exc_info=True,
+                        )
                         continue
                 else:
                     continue
