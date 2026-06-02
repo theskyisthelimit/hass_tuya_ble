@@ -49,8 +49,8 @@ DEFAULT_FINGERBOT_PRODUCT_ID = "yiihr7zh"
 
 def _entry_manager_data(entry: ConfigEntry) -> dict:
     """Merge current options with legacy fingerbot-only config entry data."""
-    data = entry.options.copy()
-    data.update(entry.data)
+    data = entry.data.copy()
+    data.update(entry.options)
     if CONF_ADDRESS not in data and LEGACY_CONF_MAC in data:
         data[CONF_ADDRESS] = data[LEGACY_CONF_MAC]
     if CONF_CATEGORY not in data:

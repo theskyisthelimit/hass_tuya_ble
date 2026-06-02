@@ -61,7 +61,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 DEFAULT_MANUAL_CATEGORY = "szjqr"
+DEFAULT_MANUAL_PRODUCT_ID = "yiihr7zh"
 DEFAULT_MANUAL_PRODUCT_NAME = "Fingerbot Plus"
+LEGACY_CONF_MAC = "mac"
 
 
 async def _try_login(
@@ -176,7 +178,130 @@ class TuyaBLEOptionsFlow(OptionsFlowWithConfigEntry):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
-        return await self.async_step_login(user_input)
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["manual", "login"],
+        )
+
+    def _current_local_options(self) -> dict[str, Any]:
+        data = self.config_entry.data.copy()
+        data.update(self.config_entry.options)
+        if CONF_ADDRESS not in data and LEGACY_CONF_MAC in data:
+            data[CONF_ADDRESS] = data[LEGACY_CONF_MAC]
+        data.setdefault(CONF_CATEGORY, DEFAULT_MANUAL_CATEGORY)
+        data.setdefault(CONF_PRODUCT_ID, DEFAULT_MANUAL_PRODUCT_ID)
+        data.setdefault(CONF_PRODUCT_NAME, DEFAULT_MANUAL_PRODUCT_NAME)
+        data.setdefault(CONF_DEVICE_NAME, self.config_entry.title)
+        data.setdefault(CONF_PRODUCT_MODEL, "")
+        data.setdefault(CONF_FUNCTIONS, [])
+        data.setdefault(CONF_STATUS_RANGE, [])
+        return data
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle local credential options."""
+        errors: dict[str, str] = {}
+        current = self._current_local_options()
+
+        if user_input is not None:
+            address = user_input[CONF_ADDRESS].strip().upper()
+            uuid = user_input[CONF_UUID].strip()
+            local_key = user_input[CONF_LOCAL_KEY].strip()
+            device_id = user_input[CONF_DEVICE_ID].strip()
+            category = user_input.get(CONF_CATEGORY, DEFAULT_MANUAL_CATEGORY).strip()
+            product_id = user_input.get(CONF_PRODUCT_ID, DEFAULT_MANUAL_PRODUCT_ID).strip()
+            product_name = (
+                user_input.get(CONF_PRODUCT_NAME, DEFAULT_MANUAL_PRODUCT_NAME).strip()
+                or DEFAULT_MANUAL_PRODUCT_NAME
+            )
+            device_name = user_input.get(CONF_DEVICE_NAME, product_name).strip()
+            if not device_name:
+                device_name = product_name
+
+            if not all((address, uuid, local_key, device_id, category, product_id)):
+                errors["base"] = "manual_credentials_invalid"
+            else:
+                options = self.config_entry.options.copy()
+                options.update(
+                    {
+                        CONF_ADDRESS: address,
+                        CONF_UUID: uuid,
+                        CONF_LOCAL_KEY: local_key,
+                        CONF_DEVICE_ID: device_id,
+                        CONF_CATEGORY: category,
+                        CONF_PRODUCT_ID: product_id,
+                        CONF_DEVICE_NAME: device_name,
+                        CONF_PRODUCT_MODEL: user_input.get(
+                            CONF_PRODUCT_MODEL, ""
+                        ).strip(),
+                        CONF_PRODUCT_NAME: product_name,
+                        CONF_FUNCTIONS: current.get(CONF_FUNCTIONS, []),
+                        CONF_STATUS_RANGE: current.get(CONF_STATUS_RANGE, []),
+                    }
+                )
+                return self.async_create_entry(
+                    title=self.config_entry.title,
+                    data=options,
+                )
+
+        if user_input is None:
+            user_input = current
+
+        return self.async_show_form(
+            step_id="manual",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ADDRESS,
+                        default=user_input.get(CONF_ADDRESS, ""),
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_LOCAL_KEY,
+                        default=user_input.get(CONF_LOCAL_KEY, ""),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.PASSWORD,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_UUID,
+                        default=user_input.get(CONF_UUID, ""),
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_DEVICE_ID,
+                        default=user_input.get(CONF_DEVICE_ID, ""),
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_CATEGORY,
+                        default=user_input.get(CONF_CATEGORY, DEFAULT_MANUAL_CATEGORY),
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_PRODUCT_ID,
+                        default=user_input.get(CONF_PRODUCT_ID, DEFAULT_MANUAL_PRODUCT_ID),
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_PRODUCT_NAME,
+                        default=user_input.get(
+                            CONF_PRODUCT_NAME,
+                            DEFAULT_MANUAL_PRODUCT_NAME,
+                        ),
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_DEVICE_NAME,
+                        default=user_input.get(
+                            CONF_DEVICE_NAME,
+                            DEFAULT_MANUAL_PRODUCT_NAME,
+                        ),
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_PRODUCT_MODEL,
+                        default=user_input.get(CONF_PRODUCT_MODEL, ""),
+                    ): selector.TextSelector(),
+                }
+            ),
+            errors=errors,
+        )
 
     async def async_step_login(
         self, user_input: dict[str, Any] | None = None
@@ -185,7 +310,10 @@ class TuyaBLEOptionsFlow(OptionsFlowWithConfigEntry):
         errors: dict[str, str] = {}
         placeholders: dict[str, Any] = {}
         credentials: TuyaBLEDeviceCredentials | None = None
-        address: str | None = self.config_entry.data.get(CONF_ADDRESS)
+        address: str | None = self.config_entry.data.get(
+            CONF_ADDRESS,
+            self.config_entry.data.get(LEGACY_CONF_MAC),
+        )
 
         if user_input is not None:
             entry: TuyaBLEData | None = None
