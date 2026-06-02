@@ -7,7 +7,6 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import selector
 
 from .const import (
     CONF_DEVICE_ID,
@@ -26,15 +25,8 @@ from .const import (
 from .fingerbot import PROFILES, get_profile
 
 
-PROFILE_OPTIONS = ["auto", *PROFILES.keys()]
-
-
 def _normalize_mac(value: str) -> str:
     return value.strip().upper()
-
-
-def _text_selector() -> selector.TextSelector:
-    return selector.TextSelector()
 
 
 class TuyaBleFingerbotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -57,7 +49,6 @@ class TuyaBleFingerbotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_profile"
             else:
                 user_input[CONF_PROFILE] = profile.name
-                user_input[CONF_TIMEOUT] = DEFAULT_TIMEOUT
                 await self.async_set_unique_id(user_input[CONF_DEVICE_ID])
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
@@ -71,46 +62,43 @@ class TuyaBleFingerbotConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(
                     CONF_NAME,
                     default=defaults.get(CONF_NAME, DEFAULT_NAME),
-                ): _text_selector(),
+                ): str,
                 vol.Required(
                     CONF_MAC,
                     default=defaults.get(CONF_MAC, ""),
-                ): _text_selector(),
+                ): str,
                 vol.Required(
                     CONF_LOCAL_KEY,
                     default=defaults.get(CONF_LOCAL_KEY, ""),
-                ): selector.TextSelector(
-                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
-                ),
+                ): str,
                 vol.Required(
                     CONF_UUID,
                     default=defaults.get(CONF_UUID, ""),
-                ): _text_selector(),
+                ): str,
                 vol.Required(
                     CONF_DEVICE_ID,
                     default=defaults.get(CONF_DEVICE_ID, ""),
-                ): _text_selector(),
+                ): str,
                 vol.Optional(
                     CONF_PRODUCT_ID,
                     default=defaults.get(CONF_PRODUCT_ID, ""),
-                ): _text_selector(),
+                ): str,
                 vol.Optional(
                     CONF_PRODUCT_NAME,
                     default=defaults.get(CONF_PRODUCT_NAME, DEFAULT_NAME),
-                ): _text_selector(),
+                ): str,
                 vol.Required(
                     CONF_PROFILE,
                     default=defaults.get(CONF_PROFILE, "auto"),
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=PROFILE_OPTIONS,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
+                ): vol.In(("auto", *PROFILES.keys())),
                 vol.Required(
                     CONF_INCLUDE_MOTION,
                     default=defaults.get(CONF_INCLUDE_MOTION, True),
-                ): selector.BooleanSelector(),
+                ): bool,
+                vol.Required(
+                    CONF_TIMEOUT,
+                    default=defaults.get(CONF_TIMEOUT, DEFAULT_TIMEOUT),
+                ): float,
             }
         )
 

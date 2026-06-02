@@ -19,7 +19,8 @@
           "product_id": "Product ID",
           "product_name": "Product name",
           "profile": "Profile",
-          "include_motion": "Send position settings before pressing"
+          "include_motion": "Send position settings before pressing",
+          "timeout": "BLE timeout"
         },
         "data_description": {
           "profile": "Use auto with a product ID when possible. Your yiihr7zh Fingerbot Plus maps to classic.",
