@@ -15,7 +15,7 @@ You can also use the provided Home Assistant connection status entities and reco
 
 Place the `custom_components` folder in your configuration directory (or add its contents to an existing `custom_components` folder). Alternatively install via [HACS](https://hacs.xyz/).
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=pascalgoedeke&repository=ha_tuya_ble&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=theskyisthelimit&repository=hass_tuya_ble&category=integration)
 
 ## Usage
 
@@ -23,6 +23,21 @@ After adding to Home Assistant integration should discover all supported Bluetoo
 
 The integration works locally, but connection to Tuya BLE device requires device ID and encryption key from Tuya IOT cloud.
 To obtain the credentials, please refer to *old* official Tuya integration [documentation](https://web.archive.org/web/20240204064157/https://www.home-assistant.io/integrations/tuya/).
+
+### Manual setup
+
+If you already have the Tuya BLE credentials, choose **Manual setup** in the config flow. This path does not require a Tuya cloud login and keeps the full Tuya BLE entity set.
+
+Required values:
+
+* MAC address
+* Local key
+* UUID
+* Device ID
+* Category
+* Product ID
+
+For Fingerbot Plus with product ID `yiihr7zh`, use category `szjqr`.
 
 ## Credits
 

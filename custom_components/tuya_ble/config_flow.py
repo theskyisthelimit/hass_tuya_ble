@@ -21,11 +21,13 @@ from homeassistant.components.bluetooth import (
 from homeassistant.const import (
     CONF_ADDRESS,
     CONF_COUNTRY_CODE,
+    CONF_DEVICE_ID,
     CONF_PASSWORD,
     CONF_USERNAME,
 )
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowHandler, FlowResult
+from homeassistant.helpers import selector
 
 from .tuya_ble import SERVICE_UUID, TuyaBLEDeviceCredentials
 
@@ -39,6 +41,15 @@ from .const import (
     TUYA_COUNTRIES,
     CONF_APP_TYPE,
     CONF_ENDPOINT,
+    CONF_LOCAL_KEY,
+    CONF_UUID,
+    CONF_CATEGORY,
+    CONF_PRODUCT_ID,
+    CONF_DEVICE_NAME,
+    CONF_PRODUCT_MODEL,
+    CONF_PRODUCT_NAME,
+    CONF_FUNCTIONS,
+    CONF_STATUS_RANGE,
     TUYA_RESPONSE_CODE,
     TUYA_RESPONSE_MSG,
     TUYA_RESPONSE_SUCCESS,
@@ -47,6 +58,10 @@ from .devices import TuyaBLEData, get_device_readable_name
 from .cloud import HASSTuyaBLEDeviceManager
 
 _LOGGER = logging.getLogger(__name__)
+
+
+DEFAULT_MANUAL_CATEGORY = "szjqr"
+DEFAULT_MANUAL_PRODUCT_NAME = "Fingerbot Plus"
 
 
 async def _try_login(
@@ -239,10 +254,121 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the user step."""
-        if self._manager is None:
-            self._manager = HASSTuyaBLEDeviceManager(self.hass, self._data)
-        await self._manager.build_cache()
-        return await self.async_step_login()
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["manual", "login"],
+        )
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle manual credentials setup."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            address = user_input[CONF_ADDRESS].strip().upper()
+            category = user_input.get(CONF_CATEGORY, DEFAULT_MANUAL_CATEGORY).strip()
+            product_id = user_input[CONF_PRODUCT_ID].strip()
+            uuid = user_input[CONF_UUID].strip()
+            local_key = user_input[CONF_LOCAL_KEY].strip()
+            device_id = user_input[CONF_DEVICE_ID].strip()
+            product_name = (
+                user_input.get(CONF_PRODUCT_NAME, DEFAULT_MANUAL_PRODUCT_NAME).strip()
+                or DEFAULT_MANUAL_PRODUCT_NAME
+            )
+            local_name = user_input.get(CONF_DEVICE_NAME, product_name).strip()
+            if not local_name:
+                local_name = product_name
+
+            if not all((address, uuid, local_key, device_id, category, product_id)):
+                errors["base"] = "manual_credentials_invalid"
+            else:
+                await self.async_set_unique_id(address, raise_on_progress=False)
+                self._abort_if_unique_id_configured()
+
+                options = {
+                    CONF_ADDRESS: address,
+                    CONF_UUID: uuid,
+                    CONF_LOCAL_KEY: local_key,
+                    CONF_DEVICE_ID: device_id,
+                    CONF_CATEGORY: category,
+                    CONF_PRODUCT_ID: product_id,
+                    CONF_DEVICE_NAME: local_name,
+                    CONF_PRODUCT_MODEL: user_input.get(CONF_PRODUCT_MODEL, "").strip(),
+                    CONF_PRODUCT_NAME: product_name,
+                    CONF_FUNCTIONS: [],
+                    CONF_STATUS_RANGE: [],
+                }
+                credentials = await HASSTuyaBLEDeviceManager(
+                    self.hass,
+                    options.copy(),
+                ).get_device_credentials(address)
+                if credentials is None:
+                    errors["base"] = "manual_credentials_invalid"
+                else:
+                    return self.async_create_entry(
+                        title=local_name,
+                        data={CONF_ADDRESS: address},
+                        options=options,
+                    )
+
+        if user_input is None:
+            user_input = {}
+
+        return self.async_show_form(
+            step_id="manual",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ADDRESS,
+                        default=user_input.get(CONF_ADDRESS, ""),
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_LOCAL_KEY,
+                        default=user_input.get(CONF_LOCAL_KEY, ""),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.PASSWORD,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_UUID,
+                        default=user_input.get(CONF_UUID, ""),
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_DEVICE_ID,
+                        default=user_input.get(CONF_DEVICE_ID, ""),
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_CATEGORY,
+                        default=user_input.get(CONF_CATEGORY, DEFAULT_MANUAL_CATEGORY),
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_PRODUCT_ID,
+                        default=user_input.get(CONF_PRODUCT_ID, ""),
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_PRODUCT_NAME,
+                        default=user_input.get(
+                            CONF_PRODUCT_NAME,
+                            DEFAULT_MANUAL_PRODUCT_NAME,
+                        ),
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_DEVICE_NAME,
+                        default=user_input.get(
+                            CONF_DEVICE_NAME,
+                            DEFAULT_MANUAL_PRODUCT_NAME,
+                        ),
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_PRODUCT_MODEL,
+                        default=user_input.get(CONF_PRODUCT_MODEL, ""),
+                    ): selector.TextSelector(),
+                }
+            ),
+            errors=errors,
+        )
 
     async def async_step_login(
         self, user_input: dict[str, Any] | None = None
@@ -251,6 +377,10 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
         data: dict[str, Any] | None = None
         errors: dict[str, str] = {}
         placeholders: dict[str, Any] = {}
+
+        if self._manager is None:
+            self._manager = HASSTuyaBLEDeviceManager(self.hass, self._data)
+            await self._manager.build_cache()
 
         if user_input is not None:
             data = await _try_login(
