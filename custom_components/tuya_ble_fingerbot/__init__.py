@@ -15,7 +15,15 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from .tuya_ble import TuyaBLEDevice
 
 from .cloud import HASSTuyaBLEDeviceManager
-from .const import DOMAIN
+from .const import (
+    CONF_CATEGORY,
+    CONF_DEVICE_NAME,
+    CONF_FUNCTIONS,
+    CONF_PRODUCT_MODEL,
+    CONF_PRODUCT_NAME,
+    CONF_STATUS_RANGE,
+    DOMAIN,
+)
 from .devices import TuyaBLECoordinator, TuyaBLEData, get_device_product_info
 
 PLATFORMS: list[Platform] = [
@@ -32,10 +40,34 @@ PLATFORMS: list[Platform] = [
 
 _LOGGER = logging.getLogger(__name__)
 
+LEGACY_CONF_MAC = "mac"
+DEFAULT_FINGERBOT_CATEGORY = "szjqr"
+DEFAULT_FINGERBOT_PRODUCT_NAME = "Fingerbot Plus"
+
+
+def _entry_manager_data(entry: ConfigEntry) -> dict:
+    """Merge current options with legacy fingerbot-only config entry data."""
+    data = entry.options.copy()
+    data.update(entry.data)
+    if CONF_ADDRESS not in data and LEGACY_CONF_MAC in data:
+        data[CONF_ADDRESS] = data[LEGACY_CONF_MAC]
+    if CONF_CATEGORY not in data:
+        data[CONF_CATEGORY] = DEFAULT_FINGERBOT_CATEGORY
+    if CONF_PRODUCT_NAME not in data:
+        data[CONF_PRODUCT_NAME] = DEFAULT_FINGERBOT_PRODUCT_NAME
+    if CONF_DEVICE_NAME not in data:
+        data[CONF_DEVICE_NAME] = entry.title or data[CONF_PRODUCT_NAME]
+    if CONF_PRODUCT_MODEL not in data:
+        data[CONF_PRODUCT_MODEL] = ""
+    data.setdefault(CONF_FUNCTIONS, [])
+    data.setdefault(CONF_STATUS_RANGE, [])
+    return data
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tuya BLE from a config entry."""
-    address: str = entry.data[CONF_ADDRESS]
+    manager_data = _entry_manager_data(entry)
+    address: str = manager_data[CONF_ADDRESS]
     ble_device = bluetooth.async_ble_device_from_address(
         hass, address.upper(), True
     ) or await get_device(address)
@@ -43,7 +75,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady(
             f"Could not find Tuya BLE device with address {address}"
         )
-    manager = HASSTuyaBLEDeviceManager(hass, entry.options.copy())
+    manager = HASSTuyaBLEDeviceManager(hass, manager_data)
     device = TuyaBLEDevice(manager, ble_device)
     await device.initialize()
     product_info = get_device_product_info(device)

@@ -6,6 +6,8 @@ This integration supports Tuya devices locally connected via BLE.
 
 It includes support for **Fingerbot Touch** (product_id 'bs3ubslo') and is primarily maintained for use with Fingerbots.
 
+The Home Assistant integration name is **Tuya BLE Fingerbot** for compatibility with existing installations, but it includes the full Tuya BLE entity model from the upstream integration.
+
 **Note on Battery Saving:** These devices usually enter sleep mode after 5 minutes of inactivity.
 To prevent battery drain, automatic reconnection is disabled.
 The connection will reestablish automatically when an action is triggered (potentially introducing a slight delay).

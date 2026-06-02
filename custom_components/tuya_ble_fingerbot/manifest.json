@@ -1,6 +1,6 @@
 {
-  "domain": "tuya_ble",
-  "name": "Tuya BLE",
+  "domain": "tuya_ble_fingerbot",
+  "name": "Tuya BLE Fingerbot",
   "bluetooth": [
     {
       "connectable": true,
@@ -14,5 +14,5 @@
   "issue_tracker": "https://github.com/theskyisthelimit/hass_tuya_ble/issues",
   "requirements": ["tuya-iot-py-sdk==0.6.6"],
   "iot_class": "local_push",
-  "version": "0.2.2"
+  "version": "0.2.3"
 }
